@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MHDTVLIV Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      background: black;
+    }
+
+    /* Top Logo */
+    #logo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 100px;
+      opacity: 0.8;
+      z-index: 20;
+    }
+
+    /* Fullscreen Center Logo Watermark */
+    #centerLogo {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      opacity: 0.15;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Controls */
+    #controls {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+    }
+
+    select, button, #telegramBtn {
+      padding: 6px 10px;
+      margin-left: 5px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: 1px solid #444;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: none;
+      border-radius: 3px;
+    }
+
+    button:hover, select:hover {
+      background: rgba(0,0,0,0.8);
+    }
+
+    #telegramBtn {
+      background: #0088cc;
+      border: 1px solid #005f99;
+    }
+
+    #telegramBtn:hover {
+      background: #005f99;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Logos -->
+  <img id="logo" src="https://tv.mhdtvp.com/MHDTV.png">
+  <img id="centerLogo" src="https://tv.mhdtvp.com/MHDTV.png">
+
+  <!-- Video -->
+  <video id="video" autoplay muted playsinline></video>
+
+  <!-- Controls -->
+  <div id="controls">
+    <select id="quality"></select>
+    <button onclick="goFullscreen()">Fullscreen</button>
+    <a id="telegramBtn" href="https://t.me/mhdtvliveworld" target="_blank">Telegram</a>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoSrc = urlParams.get('url');
+    const logoSrc = urlParams.get('logo');
+    const telegramLink = urlParams.get('tg');
+
+    if (!videoSrc) {
+      alert("No stream URL provided!");
+      throw new Error("Stream URL missing");
+    }
+
+    if (logoSrc) document.getElementById('logo').src = logoSrc;
+    if (telegramLink) document.getElementById('telegramBtn').href = telegramLink;
+
+    var video = document.getElementById('video');
+    var qualitySelect = document.getElementById('quality');
+    var hls;
+
+    function startPlayer() {
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          maxBufferLength: 20,
+          maxMaxBufferLength: 40,
+          liveSyncDuration: 3,
+          liveMaxLatencyDuration: 5,
+          lowLatencyMode: true,
+          enableWorker: true,
+          startLevel: -1,
+          capLevelToPlayerSize: true,
+          backBufferLength: 90
+        });
+
+        hls.loadSource(videoSrc);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+          video.play().catch(() => {});
+
+          // Populate quality selector
+          qualitySelect.innerHTML = "";
+          data.levels.forEach((level, index) => {
+            var option = document.createElement("option");
+            option.value = index;
+            option.text = level.height + "p";
+            qualitySelect.appendChild(option);
+          });
+        });
+
+        qualitySelect.addEventListener('change', function () {
+          hls.currentLevel = parseInt(this.value);
+        });
+
+        // Auto reconnect if stream fails
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            setTimeout(() => {
+              hls.startLoad();
+            }, 3000);
+          }
+        });
+
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = videoSrc;
+        video.addEventListener('loadedmetadata', function () {
+          video.play();
+        });
+      }
+    }
+
+    startPlayer();
+
+    // Fullscreen
+    function goFullscreen() {
+      const elem = video || document.body;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+      }
+    }
+
+    // Mobile autoplay fix
+    document.addEventListener('touchstart', function () {
+      video.muted = false;
+      video.play().catch(() => {});
+    }, { once: true });
+  </script>
+
+</body>
+</html>
